@@ -29,7 +29,7 @@ controller_objects:
         - user_name: "firstuser"
           first_name: "First"
           last_name: "User"
-          pass: "{{ initial_password }}"
+          pass: "initialpassword"
           email: "first@user.com"
           superuser: yes # This is a superuser 
           state: present
@@ -38,7 +38,7 @@ controller_objects:
         - user_name: "seconduser"
           first_name: "Second"
           last_name: "User"
-          pass: "{{ initial_password }}"
+          pass: "initialpassword"
           email: "second@user.com"
           state: present
           role_org: member

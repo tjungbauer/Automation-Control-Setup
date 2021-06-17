@@ -24,13 +24,6 @@
   failed_when:
     - stat_result.stat.exists == 0
 
-# Create tower-cli configuration
-- name: "Create tower-cli configuration"
-  template:
-    src: tower-cli.j2
-    dest: "{{ automation_controller_cli_config }}"
-    mode: 0400
-
 - name: Check if Ansible Automation Controller is running.
   uri:
     url: "{{ automation_controller_local_url }}"
