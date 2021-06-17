@@ -1,0 +1,27 @@
+---
+# Do NOT user "latest", since the extracted directory will have the version number, and ansible cannot find it later, once it has been extracted
+automation_controller_release_version: 3.8.3-1
+automation_controller_working_location: "/root"
+
+automation_controller_hosts:
+  - "10.211.55.22 ansible_connection=local"
+automation_controller_db_host: "10.211.55.24"
+automation_controller_hub_host: "10.211.55.23"
+automation_controller_hub_pg_host: "10.211.55.24"
+
+
+# Default Password used for Automation Controller deployment
+automation_controller_admin_password: "{{ controller_admin_password }}"
+automation_controller_pg_password: "{{ controller_pg_password }}"
+automation_controller_hub_admin_password: "{{ controller_hub_admin_password }}"
+automation_controller_hub_pg_password: "{{ controller_hub_pg_password }}"
+automation_controller_validate_certs: false
+
+# extra vars ... for example 'ignore_preflight_errors=true' for test installations
+automation_controller_extra_vars:
+    - ''
+#    - '-e ignore_preflight_errors=true'
+
+# to connect and authenticate to a running Automation Controller
+automation_controller_cli_config: "~/.tower_cli.cfg"
+automation_controller_manifest_zip: "/tmp/manifest.zip"

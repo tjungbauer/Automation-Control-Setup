@@ -1,0 +1,19 @@
+---
+# Playbook to install Ansible Tower as a single node
+
+- name: Setup Ansible Tower
+  hosts: tower
+  become: true
+  connection: local
+  vars_files:
+    - ../vaults/construct-siege-tower.vault
+    - ../inventory/group_vars/controller_settings.yaml
+
+  #environment: "{{ proxy_env }}"
+
+  tasks:
+    - include_role:
+        name: controller_deployer
+        tasks_from: controller_license.yaml
+      tags:
+        - license

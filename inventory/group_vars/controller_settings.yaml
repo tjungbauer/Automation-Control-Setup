@@ -1,0 +1,95 @@
+# Proxy Settings for Automation Controller
+#
+# MUST look like the following:
+#
+# env_proxy_http: '"http_proxy": "http://user:pass@127.0.0.1:1234"'
+# env_proxy_https: '"https_proxy": "https://user:pass@127.0.0.1:1234"'
+# env_proxy_noproxy: '"internal.local"'
+
+env_proxy_http: ''
+env_proxy_https: ''
+env_proxy_noproxy: ''
+
+# Basic Configuration which should be imported
+controller_objects:
+  organisations:
+    - name: "Example Organization"
+      description: "This is the Example Department"
+      
+      teams:
+        - name: "Networking Team"
+        - name: "Windows Team"
+        - name: "Linux Team"
+
+      users:
+        - user_name: "firstuser"
+          first_name: "First"
+          last_name: "User"
+          pass: "{{ initial_password }}"
+          email: "first@user.com"
+          superuser: yes
+          state: present
+          role_org: admin
+
+        - user_name: "seconduser"
+          first_name: "Second"
+          last_name: "User"
+          pass: "{{ initial_password }}"
+          email: "second@user.com"
+          state: present
+          role_org: member
+
+      credentials:
+        - name: "GIT Key"
+          description: "Git User to pull repository"
+          kind: scm
+          secrets: "{{ lookup('file', '../vaults/towercred_scm_credentials.yaml') | from_yaml }}"
+
+        - name: "SSH Machines"
+          organization: "Example Department"
+          description: "SSH credentials to login"
+          kind: ssh
+          become_method: sudo
+          secrets: "{{ lookup('file', '../vaults/towercred_ssh-access.yaml') | from_yaml }}"
+
+        - name: "Public GIT"
+          description: "Public GIT Repo"
+          kind: scm
+        
+      projects:
+        - name: "Example Project"
+          description: "This is an example projects"
+          scm_url: "https://github.com/example/test"
+          scm_type: git
+          scm_update_on_launch: "yes"
+          scm_credential: "Public GIT"
+
+      inventories:
+        - name: "Example Inventory"
+          description: "This is an example inventory"
+
+      inventory_source:
+        - name: "Example Inventory Source"
+          inventory: "Example Inventory"
+          source: scm
+          source_project: "Example Project"
+          source_path: inventory/hosts
+          update_on_launch: true
+          overwrite: true
+          overwrite_vars: true
+
+      job_templates:   
+        - name: "Example Job"
+          description: "This is an example Job"
+          job_type: "run"
+          playbook: "rollout_os_config.yml"
+          project: "Example Project"
+          inventory: "Example Inventory"
+          credential: "SSH Machines"
+
+      workflow_templates:
+        - name: "Example Workflow"
+          description: "This is an example Workflow"
+          organization: "Example Department"
+          schema: "{{ lookup('file', '../workflows/wf_example.yaml') }}"
+          allow_simultaneous: true

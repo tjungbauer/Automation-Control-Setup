@@ -1,0 +1,48 @@
+---
+# Playbook to install Ansible Automation Controller
+
+- name: Setup Ansible Automation Controller aka Tower
+  hosts: tower
+  become: true
+  connection: local
+  vars_files:
+    - ../vaults/construct-siege-tower.vault
+    - ../inventory/group_vars/controller_settings.yaml
+
+  #environment: "{{ proxy_env }}"
+
+  pre_tasks:
+    - name: Add tower-cli via PIP
+      pip:
+        name: ansible-tower-cli
+
+  tasks:
+
+    - include_role:
+        name: controller_deployer
+        tasks_from: controller_install.yaml
+      tags:
+        - install
+
+    - include_role:
+        name: controller_deployer
+        tasks_from: controller_license.yaml
+      tags:
+        - license
+
+    - include_role:
+        name: controller_deployer
+        tasks_from: controller_create_token.yaml
+      tags:
+        - token
+
+    # This is actually a post isntall setting, but it was put here, to create a working Tower in case a proxy is required.
+    - name: Configure http(s) proxy for tower
+      tower_settings:
+        name: "AWX_TASK_ENV"
+        value: '{ {{ env_proxy_http }}, {{ env_proxy_https }}, {{ env_proxy_noproxy }} }'
+      when: env_proxy_http is defined and env_proxy_http != "" or
+            env_proxy_https is defined and env_proxy_https != "" or
+            env_proxy_noproxy is defined and env_proxy_noproxy != ""
+      tags:
+        - proxy

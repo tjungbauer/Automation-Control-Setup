@@ -1,0 +1,6 @@
+
+- project: "Example Project"
+  success: 
+    - inventory_source: "Example Inventory Source"
+      success:
+        - job_template: "Example Job"
