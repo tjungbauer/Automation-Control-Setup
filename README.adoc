@@ -1,0 +1,347 @@
+# Deployment and initial Setup of Ansible Automation Platform
+
+## Introduction 
+
+The idea of these playbooks and roles is to deploy Ansible Automation Platform and to feed an initial configuration into Tower. It does not replace the setup shell script, nor does it try to create any possible settings inside Ansible Tower but it tries to automate the process of an initial deployment. 
+
+The following playbooks are available: 
+
+- Building_Controller ... This installs Ansible Tower by leveraging default setup script, imports the Subscription manifest and, optionally, can set an environment proxy
+- Siege_Tower         ... Imports initial configuration and can create objects like: organization, credentials, projects, jobs and workflows 
+- Update_License      ... Simply updates a subscription 
+
+It is assumed that these playbooks are executed on the Ansible Tower node. 
+
+The following roles are used: 
+
+- controller_configurator ... Tasks collection to create objects inside Ansible Tower 
+- conroller_deployer      ... Install routine for Ansible Tower 
+
+Both roles require the collection awx.awx 
+
+In the following example 3 nodes are used: 
+
+. Ansible Tower (10.211.55.22)
+. Automation Hub (10.211.55.23)
+. Ansible Tower Postgres database node (10.211.55.24)
+
+## Configuration 
+
+### Inventory 
+
+The default inventory assumes that playbooks are executed on the Tower node 
+
+----
+[tower]
+localhost
+----
+
+### SSH Access 
+
+Ansible Automation Platform contains several nodes, like Tower, Automationhub and database. 
+The Tower node where these installation playbooks are executed must be able to connect to all other nodes. 
+
+Therefore, create a ssh key and copy it to the target nodes
+
+[source,bash]
+----
+ssh-keygen
+[...]
+
+ssh-copy-id -i /root/.ssh/id_rsa root@10.211.55.23
+ssh-copy-id -i /root/.ssh/id_rsa root@10.211.55.24
+----
+
+### Install Prerequisites 
+
+To use Ansible scripts, ansible itself must be installed. Enable the following repository and install the packages on the execution node: 
+
+[source,bash]
+----
+subscription-manager repos --enable ansible-2.9-for-rhel-8-x86_64-rpms
+yum install python3 python3-pip git ansible
+----
+
+Clone the repository to the execution node:
+
+[source,bash]
+----
+git clone https://github.com/tjungbauer/Automation-Control-Setup.git
+----
+
+Install the awx.awx collection: 
+
+[source,bash]
+----
+ansible-galaxy collection install -r requirements.yml
+----
+
+### Retrieve manifest.zip from Red Hat 
+
+To deploy the subscription a manifest.zip file must be downloaded an placed onto the execution node. 
+While the import will be done by the playbooks the manifest.zip can be created as documented here: https://docs.ansible.com/ansible-tower/latest/html/userguide/import_license.html#obtaining-a-subscriptions-manifest 
+
+### Configuration 
+
+Several configuration settings must be considered before executing the playbooks. 
+
+#### Configure Setup Variables (group_vars/all.yaml)
+
+Review the following settings and change accordingly: 
+
+[source,yaml]
+----
+# Do NOT user "latest", since the extracted directory will have the version number, and ansible cannot find it later, once it has been extracted
+automation_controller_release_version: 3.8.3-1
+
+# Define the working directory where the setup will be executed
+automation_controller_working_location: "/root"
+
+# Define list of Ansible Tower nodes. For HA 3 should be defined at least.
+# The installation playbooks are executed on 10.211.55.22, therefore connection is set to local.
+automation_controller_hosts:
+  - "10.211.55.22 ansible_connection=local"
+
+# Host for Tower database
+automation_controller_db_host: "10.211.55.24"
+
+# Host for Automation Hub, MUST NOT be the same IP as Ansible Tower node
+automation_controller_hub_host: "10.211.55.23"
+
+# Host for Automation Hub database, can be the same like Tower database
+automation_controller_hub_pg_host: "10.211.55.24"
+
+
+# Default Passwords for UI and database used for Automation Controller deployment. All variables are defined in the vault "vaults/construct-siege-tower.vault"
+automation_controller_admin_password: "{{ controller_admin_password }}"
+automation_controller_pg_password: "{{ controller_pg_password }}"
+automation_controller_hub_admin_password: "{{ controller_hub_admin_password }}"
+automation_controller_hub_pg_password: "{{ controller_hub_pg_password }}"
+automation_controller_validate_certs: false
+
+# extra vars ... for example 'ignore_preflight_errors=true' for test installations
+automation_controller_extra_vars:
+    - ''
+#    - '-e ignore_preflight_errors=true'
+
+# to connect and authenticate to a running Automation Controller
+automation_controller_cli_config: "~/.tower_cli.cfg"
+
+# Path to the maifest.zip file, which was downloaded from Red Hat
+automation_controller_manifest_zip: "/tmp/manifest.zip"
+----
+
+#### Configure Setup Vault (vaults/construct-siege-tower.vault)
+
+The vault is responsible to store the password for the different Ansible Tower components securely. 
+
+The example vault has the password "redhat" and looks like the following: 
+
+[source,yaml]
+----
+# Automation Controller Basic Credentials
+controller_admin_password: "redhat"
+controller_pg_password: "redhat"
+controller_hub_admin_password: "redhat"
+controller_hub_pg_password: "redhat"
+----
+
+CAUTION: Delete the example and create your own vault with your own password and the variables listed above. 
+
+
+#### Configure Setting Variables (group_vars/controller_settings.yaml)
+
+The base settings, when executed, require detail review of the different objects.
+All objects are created using modules from here: https://docs.ansible.com/ansible/latest/collections/awx/awx/index.html 
+
+NOTE: Not all options are listed here, please refer the the documentation of the awx modules. 
+
+[source,yaml]
+----
+# Proxy Settings for Automation Controller
+#
+# MUST look like the following:
+#
+# env_proxy_http: '"http_proxy": "http://user:pass@127.0.0.1:1234"'
+# env_proxy_https: '"https_proxy": "https://user:pass@127.0.0.1:1234"'
+# env_proxy_noproxy: '"internal.local"'
+
+env_proxy_http: ''
+env_proxy_https: ''
+env_proxy_noproxy: ''
+
+# Basic Configuration which should be imported
+controller_objects:
+
+  # Create an example organization
+  organisations:
+    - name: "Example Organization"
+      description: "This is the Example Department"
+      
+      # Create the following teams in that organization
+      teams:
+        - name: "Networking Team"
+        - name: "Windows Team"
+        - name: "Linux Team"
+
+      # Create users, using password stored in vaults 
+      users:
+        - user_name: "firstuser"
+          first_name: "First"
+          last_name: "User"
+          pass: "{{ initial_password }}"
+          email: "first@user.com"
+          superuser: yes # This is a superuser 
+          state: present
+          role_org: admin 
+
+        - user_name: "seconduser"
+          first_name: "Second"
+          last_name: "User"
+          pass: "{{ initial_password }}"
+          email: "second@user.com"
+          state: present
+          role_org: member
+
+      # Create some example credentials, be sure to store the secrets in a vault
+      credentials:
+        - name: "GIT Key"
+          description: "Git User to pull repository"
+          kind: scm
+          secrets: "{{ lookup('file', '../vaults/towercred_scm_credentials.yaml') | from_yaml }}"
+
+        - name: "SSH Machines"
+          organization: "Example Department"
+          description: "SSH credentials to login"
+          kind: ssh
+          become_method: sudo
+          secrets: "{{ lookup('file', '../vaults/towercred_ssh-access.yaml') | from_yaml }}"
+
+        - name: "Public GIT"
+          description: "Public GIT Repo"
+          kind: scm
+    
+      # Create an example project, here the "scm_credentials" is the name of organization.credentials.name In this example "Public GIT" (see above)
+      # The example code at https://github.com/tjungbauer/example_playbook is used. 
+      projects:
+        - name: "Example Project"
+          description: "This is an example projects"
+          scm_url: "https://github.com/tjungbauer/example_playbook"
+          scm_type: git
+          scm_update_on_launch: "yes"
+          scm_credential: "Public GIT"
+
+      # Create an example inventory
+      inventories:
+        - name: "Example Inventory"
+          description: "This is an example inventory"
+
+      # Create an example inventory source, using SCM. "source_project" is the name of organization.project.name (see above)
+      inventory_source:
+        - name: "Example Inventory Source"
+          inventory: "Example Inventory"
+          source: scm
+          source_project: "Example Project"
+          source_path: inventory/hosts
+          update_on_launch: true
+          overwrite: true
+          overwrite_vars: true
+
+      # Create an example Job. The keys "project", "inventory" and "credentials" are the names of the previously defined objects (see above)
+      job_templates:   
+        - name: "Example Job"
+          description: "This is an example Job"
+          job_type: "run"
+          playbook: "example_playbook.yaml"
+          project: "Example Project"
+          inventory: "Example Inventory"
+          credential: "SSH Machines"
+
+      # Create an example Workflow. The keys "organization" is the name of the organization we are assinging the Workflow
+      # The actual login of the Workflow is defined under workflows/wf_example.yaml
+      workflow_templates:
+        - name: "Example Workflow"
+          description: "This is an example Workflow"
+          organization: "Example Department"
+          schema: "{{ lookup('file', '../workflows/wf_example.yaml') }}"
+          allow_simultaneous: true
+----
+
+#### Creating a Workflow 
+
+Workflows are rather complex objects and their configuration is stored in a separated file under /workflows
+
+The following example is using 3 steps, executed when the previous was successful: 
+
+. Sync the project "Example Project"
+. Sync the inventory "Example Inventory Source"
+. Execute the Job "Example Job"
+
+[source,yaml]
+----
+- project: "Example Project"
+  success: 
+    - inventory_source: "Example Inventory Source"
+      success:
+        - job_template: "Example Job"
+----
+
+Please refer to the official documentation in case you want to create complex Workflows using these playbooks: 
+https://docs.ansible.com/ansible/latest/collections/awx/awx/tower_workflow_job_template_module.html#ansible-collections-awx-awx-tower-workflow-job-template-module 
+
+#
+### Configure Configuration Vaults (i.e. vaults/towercred_ssh-access.yaml)
+
+To create the initial configuration, several vaults are used in these examples (Password = "redhat"): 
+
+For instance the vaults for the credentials look like the following and define "username" and "ssh_key_data": 
+
+[source,yaml]
+----
+username: exampleuser
+
+ # This is an EXAMPLE !!!
+ ssh_key_data: "-----BEGIN RSA PRIVATE KEY-----
+ MIICXAIBAAKBgQCqGKukO1De7zhZj6+H0qtjTkVxwTCpvKe4eCZ0FPqri0cb2JZfXJ/DgYSF6vUp
+ wmJG8wVQZKjeGcjDOL5UlsuusFncCzWBQ7RKNUSesmQRMSGkVb1/3j+skZ6UtW+5u09lHNsj6tQ5
+ 1s1SPrCBkedbNf0Tp0GbMJDyR4e9T04ZZwIDAQABAoGAFijko56+qGyN8M0RVyaRAXz++xTqHBLh
+ 3tx4VgMtrQ+WEgCjhoTwo23KMBAuJGSYnRmoBZM3lMfTKevIkAidPExvYCdm5dYq3XToLkkLv5L2
+ pIIVOFMDG+KESnAFV7l2c+cnzRMW0+b6f8mR1CJzZuxVLL6Q02fvLi55/mbSYxECQQDeAw6fiIQX
+ GukBI4eMZZt4nscy2o12KyYner3VpoeE+Np2q+Z3pvAMd/aNzQ/W9WaI+NRfcxUJrmfPwIGm63il
+ AkEAxCL5HQb2bQr4ByorcMWm/hEP2MZzROV73yF41hPsRC9m66KrheO9HPTJuo3/9s5p+sqGxOlF
+ L0NDt4SkosjgGwJAFklyR1uZ/wPJjj611cdBcztlPdqoxssQGnh85BzCj/u3WqBpE2vjvyyvyI5k
+ X6zk7S0ljKtt2jny2+00VsBerQJBAJGC1Mg5Oydo5NwD6BiROrPxGo2bpTbu/fhrT8ebHkTz2epl
+ U9VQQSQzY1oZMVX8i1m5WUTLPz2yLJIBQVdXqhMCQBGoiuSoSjafUhV7i1cEGpb88h5NBYZzWXGZ
+ 37sJ5QsW+sJyoNde3xH8vdXhzU7eT82D6X/scw9RZz+/6rCJ4p0=
+ -----END RSA PRIVATE KEY-----"
+----
+
+WARNING: Every credentials should have its very own vault file 
+
+NOTE: For the users, it is assumed that a default password is created, which the users change during the authentication or that the authentication is done via an external system, like LDAP. 
+
+## Install Ansible Tower 
+
+To install Ansible Tower execute the following playbook. It will download the tar.gz and installs everything. This playbook will run quite long, since the setup will install all dependencies, the database and so on. 
+
+Since vaults are used, the password of the vault must be provided. Either execute with the switch "--ask-vault-pass" or create a hidden file called .vault_pass with mode 400 and put the cleartext password in there. 
+
+Execute either: 
+
+[source,bash]
+----
+ansible-playbook --ask-vault-pass playbooks/Building_Controller.yaml OR
+
+ansible-playbook --vault-password-file=.vault_pass playbooks/Building_Controller.yaml 
+----
+
+## Configure Ansible Tower 
+
+Execute either: 
+
+[source,bash]
+----
+ansible-playbook --ask-vault-pass playbooks/Siege_Tower.yaml OR
+
+ansible-playbook --vault-password-file=.vault_pass playbooks/Siege_Tower.yaml 
+----

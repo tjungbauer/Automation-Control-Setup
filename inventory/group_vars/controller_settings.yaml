@@ -12,24 +12,28 @@ env_proxy_noproxy: ''
 
 # Basic Configuration which should be imported
 controller_objects:
+
+  # Create an example organization
   organisations:
     - name: "Example Organization"
       description: "This is the Example Department"
       
+      # Create the following teams in that organization
       teams:
         - name: "Networking Team"
         - name: "Windows Team"
         - name: "Linux Team"
 
+      # Create users, using password stored in vaults 
       users:
         - user_name: "firstuser"
           first_name: "First"
           last_name: "User"
           pass: "{{ initial_password }}"
           email: "first@user.com"
-          superuser: yes
+          superuser: yes # This is a superuser 
           state: present
-          role_org: admin
+          role_org: admin 
 
         - user_name: "seconduser"
           first_name: "Second"
@@ -39,6 +43,7 @@ controller_objects:
           state: present
           role_org: member
 
+      # Create some example credentials, be sure to store the secrets in a vault
       credentials:
         - name: "GIT Key"
           description: "Git User to pull repository"
@@ -55,19 +60,23 @@ controller_objects:
         - name: "Public GIT"
           description: "Public GIT Repo"
           kind: scm
-        
+    
+      # Create an example project, here the "scm_credentials" is the name of organization.credentials.name In this example "Public GIT" (see above)
+      # The example code at https://github.com/tjungbauer/example_playbook is used. 
       projects:
         - name: "Example Project"
           description: "This is an example projects"
-          scm_url: "https://github.com/example/test"
+          scm_url: "https://github.com/tjungbauer/example_playbook"
           scm_type: git
           scm_update_on_launch: "yes"
           scm_credential: "Public GIT"
 
+      # Create an example inventory
       inventories:
         - name: "Example Inventory"
           description: "This is an example inventory"
 
+      # Create an example inventory source, using SCM. "source_project" is the name of organization.project.name (see above)
       inventory_source:
         - name: "Example Inventory Source"
           inventory: "Example Inventory"
@@ -78,15 +87,18 @@ controller_objects:
           overwrite: true
           overwrite_vars: true
 
+      # Create an example Job. The keys "project", "inventory" and "credentials" are the names of the previously defined objects (see above)
       job_templates:   
         - name: "Example Job"
           description: "This is an example Job"
           job_type: "run"
-          playbook: "rollout_os_config.yml"
+          playbook: "example_playbook.yaml"
           project: "Example Project"
           inventory: "Example Inventory"
           credential: "SSH Machines"
 
+      # Create an example Workflow. The keys "organization" is the name of the organization we are assinging the Workflow
+      # The actual login of the Workflow is defined under workflows/wf_example.yaml
       workflow_templates:
         - name: "Example Workflow"
           description: "This is an example Workflow"
