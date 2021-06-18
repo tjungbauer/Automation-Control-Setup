@@ -9,7 +9,7 @@
     - ../vaults/construct-siege-tower.vault
     - ../inventory/group_vars/controller_settings.yaml
 
-  #environment: "{{ proxy_env }}"
+  #environment: "{{ system_proxy_env }}"
 
   tasks:
     - include_role:

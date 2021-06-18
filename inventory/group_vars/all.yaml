@@ -1,3 +1,10 @@
+# OS Proxy Settings, required if system must talk to a proxy to reach the internet. 
+# Used by these Ansible Playbooks
+system_proxy_env:
+  http_proxy: http://127.0.0.1:8080
+  https_proxy: https://127.0.0.1:8080
+
+
 # Do NOT user "latest", since the extracted directory will have the version number, and ansible cannot find it later, once it has been extracted
 automation_controller_release_version: 3.8.3-1
 

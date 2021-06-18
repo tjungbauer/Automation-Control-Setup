@@ -7,6 +7,8 @@
     - ../vaults/construct-siege-tower.vault
     - ../inventory/group_vars/controller_settings.yaml
 
+  #environment: "{{ system_proxy_env }}"
+
   # re-use AWX collection
   collections:
   - awx.awx
